@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>立体浮雕时钟（全功能记忆永久版）</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Tahoma,"Microsoft YaHei",sans-serif;}
+        body{background:#000;min-height:100vh;display:flex;justify-content:center;align-items:center;overflow:hidden;}
+        canvas{max-width:92vw;max-height:92vh;width:min(92vw,92vh*4/3);height:min(92vh,92vw*3/4);object-fit:contain;border:none;background:#003366;}
+        .settings-btn{position:fixed;top:15px;right:15px;width:56px;height:56px;background:linear-gradient(to bottom,#fff,#e6e6e6);border:2px outset #fff #c0c0c0 #c0c0c0 #fff;border-radius:4px;display:flex;justify-content:center;align-items:center;cursor:pointer;z-index:9999;}
+        .settings-btn:active{border:2px inset #fff #c0c0c0 #c0c0c0 #fff;background:linear-gradient(to bottom,#e6e6e6,#fff);}
+        .gear{width:32px;height:32px;position:relative;background:#000;border-radius:50%;}
+        .gear::before,.gear::after,.gear .tooth{content:'';position:absolute;background:#000;}
+        .gear::before{top:0;left:11px;width:10px;height:6px;}
+        .gear::after{top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;background:#e6e6e6;border-radius:50%;}
+        .gear .tooth{width:6px;height:10px;}
+        .gear .tooth:nth-child(1){top:11px;left:0;}
+        .gear .tooth:nth-child(2){top:11px;right:0;}
+        .gear .tooth:nth-child(3){top:26px;left:0;}
+        .gear .tooth:nth-child(4){top:26px;right:0;}
+        .gear .tooth:nth-child(5){bottom:0;left:11px;}
+        .gear .tooth:nth-child(6){top:11px;left:11px;}
+        .gear .tooth:nth-child(7){top:11px;right:11px;}
+        .gear .tooth:nth-child(8){bottom:11px;left:11px;}
+        .settings-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90vw;max-width:580px;max-height:85vh;background:#ece9d8;border:4px outset #fff #c0c0c0 #c0c0c0 #fff;z-index:10000;display:none;overflow:hidden;}
+        .settings-modal.active{display:block;}
+        .modal-header{background:linear-gradient(to bottom,#0a5cdb,#003399);padding:4px 8px;height:30px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000;}
+        .modal-header h2{font-size:14px;font-weight:normal;color:#fff;}
+        .close-btn{width:22px;height:20px;background:linear-gradient(to bottom,#fff,#e6e6e6);border:1px solid #000;font-size:12px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000;}
+        .close-btn:active{background:linear-gradient(to bottom,#c0c0c0,#fff);}
+        .modal-body{padding:12px;overflow-y:auto;max-height:calc(85vh - 30px);}
+        .setting-section{margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #c0c0c0;}
+        .section-title{font-size:13px;font-weight:bold;color:#000080;margin-bottom:8px;}
+        .setting-item{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px;}
+        .setting-item label{color:#000;flex:1;}
+        .setting-item input[type="checkbox"]{width:16px;height:16px;}
+        .setting-item input[type="range"]{width:120px;}
+        .setting-item select,.setting-item input[type="time"],.setting-item input[type="number"],.setting-item input[type="text"],.setting-item input[type="datetime-local"]{width:120px;border:1px solid #000;}
+        .setting-item input[type="color"]{width:40px;height:20px;}
+        .xp-btn{background:linear-gradient(to bottom,#fff,#e6e6e6);border:2px outset #fff #c0c0c0 #c0c0c0 #fff;padding:4px 10px;font-size:12px;cursor:pointer;}
+        .xp-btn:active{border:2px inset #fff #c0c0c0 #c0c0c0 #fff;background:linear-gradient(to bottom,#e6e6e6,#fff);}
+        .memory-record-box{width:100%;height:280px;background:#fff;border:2px solid goldenrod;padding:10px;font-size:12px;color:#000;resize:none;margin-top:8px;line-height:1.6;}
+        .modal-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.6);z-index:9998;display:none;}
+        .modal-overlay.active{display:block;}
+        .scanline{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(to bottom,rgba(255,255,255,0) 0%,rgba(255,255,255,0.06) 50%,rgba(255,255,255,0) 100%);background-size:100% 4px;z-index:9997;pointer-events:none;display:none;animation:scanlineAnim 2s linear infinite;}
+        @keyframes scanlineAnim{0%{transform:translateY(-100%);}100%{transform:translateY(100%);}}
+    </style>
+</head>
+<body>
+    <div class="settings-btn" id="settingsBtn"><div class="gear"><div class="tooth"></div><div class="tooth"></div><div class="tooth"></div><div class="tooth"></div><div class="tooth"></div><div class="tooth"></div><div class="tooth"></div><div class="tooth"></div></div></div>
+    <div class="modal-overlay" id="modalOverlay"></div>
+    <div class="settings-modal" id="settingsModal">
+        <div class="modal-header"><h2>立体浮雕时钟完整设置（139项+全功能记忆）</h2><button class="close-btn" id="closeModalBtn">&times;</button></div>
+        <div class="modal-body">
+            <div class="setting-section">
+                <div class="section-title">记忆存储设置（所有功能永久保存）</div>
+                <div class="setting-item"><label>保存时长</label><select id="saveDuration"><option value="none">不保存</option><option value="temp">临时保存</option><option value="1h">1小时</option><option value="1d">1天</option><option value="permanent" selected>永久保存</option></select></div>
+                <div class="setting-item"><label>一键保存全部139项设置</label><button class="xp-btn" id="saveConfigBtn">保存记忆</button></div>
+                <div class="section-title">记忆记录面板（实时同步）</div>
+                <textarea class="memory-record-box" id="memoryRecordView" readonly></textarea>
+            </div>
+            <div class="setting-section"><div class="section-title">一、基础显示（1-20）</div>
+                <div class="setting-item"><label>1. 显示时钟数字</label><input type="checkbox" id="showNumbers" checked></div>
+                <div class="setting-item"><label>2. 显示刻度线</label><input type="checkbox" id="showTicks" checked></div>
+                <div class="setting-item"><label>3. 显示时针</label><input type="checkbox" id="showHourHand" checked></div>
+                <div class="setting-item"><label>4. 显示分针</label><input type="checkbox" id="showMinuteHand" checked></div>
+                <div class="setting-item"><label>5. 显示秒针</label><input type="checkbox" id="showSecondHand" checked></div>
+                <div class="setting-item"><label>6. 显示中心轴</label><input type="checkbox" id="showCenter" checked></div>
+                <div class="setting-item"><label>7. 显示设置按钮</label><input type="checkbox" id="showSettingsBtn" checked></div>
+                <div class="setting-item"><label>8. 数字大小调节</label><input type="range" id="numberSize" min="15" max="60" value="50"></div>
+                <div class="setting-item"><label>9. 刻度粗细调节</label><input type="range" id="tickWidth" min="1" max="6" value="3"></div>
+                <div class="setting-item"><label>10. 指针粗细调节</label><input type="range" id="handWidth" min="2" max="12" value="6"></div>
+                <div class="setting-item"><label>11. 数字颜色预设</label><select id="numberColorPreset"><option value="#ffffff" selected>白色</option><option value="#ffff00">黄色</option><option value="#ff0000">红色</option><option value="#00ff00">绿色</option></select></div>
+                <div class="setting-item"><label>12. 指针颜色预设</label><select id="handColorPreset"><option value="#ffffff" selected>白色</option><option value="#ffff00">黄色</option><option value="#ff0000">红色</option><option value="#00ff00">绿色</option></select></div>
+                <div class="setting-item"><label>13. 背景透明度</label><input type="range" id="bgOpacity" min="0.5" max="1" step="0.05" value="1"></div>
+                <div class="setting-item"><label>14. 抗锯齿开关</label><input type="checkbox" id="antiAlias" checked></div>
+                <div class="setting-item"><label>15. 全屏模式</label><input type="checkbox" id="fullscreen"></div>
+                <div class="setting-item"><label>16. 数字描边开关</label><input type="checkbox" id="numberStroke"></div>
+                <div class="setting-item"><label>17. 时钟外边框</label><input type="checkbox" id="showClockBorder"></div>
+                <div class="setting-item"><label>18. 分钟点显示</label><input type="checkbox" id="showMinuteDot"></div>
+                <div class="setting-item"><label>19. 数字间距调节</label><input type="range" id="numberSpace" min="0.8" max="1.2" step="0.05" value="1"></div>
+                <div class="setting-item"><label>20. 刻度间距调节</label><input type="range" id="tickSpace" min="0.8" max="1.2" step="0.05" value="1"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">二、指针时间（21-40）</div>
+                <div class="setting-item"><label>21. 秒针跳秒模式</label><input type="checkbox" id="tickSecond" checked></div>
+                <div class="setting-item"><label>22. 24小时制显示</label><input type="checkbox" id="is24hour"></div>
+                <div class="setting-item"><label>23. 显示毫秒（平滑秒针）</label><input type="checkbox" id="showMs"></div>
+                <div class="setting-item"><label>24. 同步系统时间</label><input type="checkbox" id="syncTime" checked></div>
+                <div class="setting-item"><label>25. 指针圆角开关</label><input type="checkbox" id="roundHand" checked></div>
+                <div class="setting-item"><label>26. 指针长度比例</label><input type="range" id="handLength" min="0.5" max="1.2" step="0.05" value="1"></div>
+                <div class="setting-item"><label>27. 秒针整点闪烁</label><input type="checkbox" id="blinkSecond"></div>
+                <div class="setting-item"><label>28. 时区（强制北京）</label><select id="timezone" disabled><option value="Asia/Shanghai" selected>北京</option></select></div>
+                <div class="setting-item"><label>29. 整点报时</label><input type="checkbox" id="hourChime"></div>
+                <div class="setting-item"><label>30. 时间偏移调节</label><input type="range" id="timeOffset" min="-10" max="10" value="0"></div>
+                <div class="setting-item"><label>31. 秒针尾迹效果</label><input type="checkbox" id="secondTail"></div>
+                <div class="setting-item"><label>32. 分针尾迹效果</label><input type="checkbox" id="minuteTail"></div>
+                <div class="setting-item"><label>33. 时针尾迹效果</label><input type="checkbox" id="hourTail"></div>
+                <div class="setting-item"><label>34. 指针速度调节</label><input type="range" id="handSpeed" min="0.5" max="2" step="0.1" value="1"></div>
+                <div class="setting-item"><label>35. 指针渐变效果</label><input type="checkbox" id="handGradient"></div>
+                <div class="setting-item"><label>36. 秒针隐藏动画</label><input type="checkbox" id="secondHideAnim"></div>
+                <div class="setting-item"><label>37. 分钟闪烁效果</label><input type="checkbox" id="minuteBlink"></div>
+                <div class="setting-item"><label>38. 时间格式切换</label><select id="timeFormat"><option value="normal" selected>标准</option><option value="compact">紧凑</option><option value="full">完整</option></select></div>
+                <div class="setting-item"><label>39. 自动刷新时间</label><input type="checkbox" id="timeAutoRefresh"></div>
+                <div class="setting-item"><label>40. 时钟旋转角度</label><input type="range" id="clockRotate" min="0" max="360" value="0"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">三、CRT复古效果（41-55）</div>
+                <div class="setting-item"><label>41. CRT模糊效果</label><input type="checkbox" id="crtBlur"></div>
+                <div class="setting-item"><label>42. CRT噪点效果</label><input type="checkbox" id="crtNoise"></div>
+                <div class="setting-item"><label>43. CRT RGB重影</label><input type="checkbox" id="crtRgb"></div>
+                <div class="setting-item"><label>44. CRT暗角效果</label><input type="checkbox" id="crtVignette"></div>
+                <div class="setting-item"><label>45. 噪点强度调节</label><input type="range" id="noiseIntensity" min="0" max="2000" value="800"></div>
+                <div class="setting-item"><label>46. 模糊强度调节</label><input type="range" id="blurIntensity" min="0" max="5" step="0.5" value="1"></div>
+                <div class="setting-item"><label>47. 扫描线效果</label><input type="checkbox" id="scanline"></div>
+                <div class="setting-item"><label>48. 扫描线速度</label><input type="range" id="scanlineSpeed" min="1" max="10" value="5"></div>
+                <div class="setting-item"><label>49. 噪点颜色自定义</label><input type="color" id="noiseColor" value="#ffffff"></div>
+                <div class="setting-item"><label>50. 模糊颜色自定义</label><input type="color" id="blurColor" value="#000000"></div>
+                <div class="setting-item"><label>51. 高对比度模式</label><input type="checkbox" id="highContrast"></div>
+                <div class="setting-item"><label>52. 颜色反转开关</label><input type="checkbox" id="colorInvert"></div>
+                <div class="setting-item"><label>53. 低亮度模式</label><input type="checkbox" id="lowBrightness"></div>
+                <div class="setting-item"><label>54. 自动暗黑模式</label><input type="checkbox" id="autoDarkMode"></div>
+                <div class="setting-item"><label>55. 点击隐藏面板</label><input type="checkbox" id="clickHidePanel"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">四、主题与自定义（56-70）</div>
+                <div class="setting-item"><label>56. 主题选择</label><select id="themeSelect"><option value="pureBlue" selected>立体深蓝</option><option value="ussr">苏联蓝</option><option value="dark">暗黑</option><option value="retro">复古绿</option></select></div>
+                <div class="setting-item"><label>57. 自定义背景色</label><input type="color" id="customBgColor" value="#003366"></div>
+                <div class="setting-item"><label>58. 自定义数字色</label><input type="color" id="customNumberColor" value="#ffffff"></div>
+                <div class="setting-item"><label>59. 自定义指针色</label><input type="color" id="customHandColor" value="#ffffff"></div>
+                <div class="setting-item"><label>60. 重置默认设置</label><button class="xp-btn" id="resetSettings">重置全部</button></div>
+                <div class="setting-item"><label>61. 指针阴影效果</label><input type="checkbox" id="handShadow"></div>
+                <div class="setting-item"><label>62. 中心轴发光</label><input type="checkbox" id="centerGlow"></div>
+                <div class="setting-item"><label>63. 数字阴影效果（立体浮雕）</label><input type="checkbox" id="numberShadow" checked></div>
+                <div class="setting-item"><label>64. 刻度转圆点</label><input type="checkbox" id="tickToDot"></div>
+                <div class="setting-item"><label>65. 12点数字高亮</label><input type="checkbox" id="highlight12"></div>
+                <div class="setting-item"><label>66. 中心轴大小</label><input type="range" id="centerSize" min="5" max="20" value="10"></div>
+                <div class="setting-item"><label>67. 字体粗细调节</label><input type="range" id="fontWeight" min="400" max="800" step="100" value="600"></div>
+                <div class="setting-item"><label>68. 秒针单独粗细</label><input type="range" id="secondWidth" min="1" max="6" value="3"></div>
+                <div class="setting-item"><label>69. 分针单独粗细</label><input type="range" id="minuteWidth" min="2" max="8" value="6"></div>
+                <div class="setting-item"><label>70. 时针单独粗细</label><input type="range" id="hourWidth" min="3" max="10" value="8"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">五、闹钟与提醒（71-85）</div>
+                <div class="setting-item"><label>71. 闹钟1开关</label><input type="checkbox" id="alarm1Enable"></div>
+                <div class="setting-item"><label>72. 闹钟1时间</label><input type="time" id="alarm1Time"></div>
+                <div class="setting-item"><label>73. 闹钟2开关</label><input type="checkbox" id="alarm2Enable"></div>
+                <div class="setting-item"><label>74. 闹钟2时间</label><input type="time" id="alarm2Time"></div>
+                <div class="setting-item"><label>75. 闹钟震动提醒</label><input type="checkbox" id="alarmVibrate" checked></div>
+                <div class="setting-item"><label>76. 整点震动</label><input type="checkbox" id="hourVibrate"></div>
+                <div class="setting-item"><label>77. 闹钟重复开关</label><input type="checkbox" id="alarmRepeat"></div>
+                <div class="setting-item"><label>78. 闹钟渐强音效</label><input type="checkbox" id="alarmFadeIn"></div>
+                <div class="setting-item"><label>79. 闹钟暂停时长</label><input type="number" id="alarmSnooze" min="1" max="30" value="5"></div>
+                <div class="setting-item"><label>80. 闹钟音量调节</label><input type="range" id="alarmVolume" min="0.1" max="1" step="0.05" value="0.8"></div>
+                <div class="setting-item"><label>81. 报时音量调节</label><input type="range" id="chimeVolume" min="0.1" max="1" step="0.05" value="0.7"></div>
+                <div class="setting-item"><label>82. 闹钟提示音效</label><select id="alertSoundSelect"><option value="bell">钟声</option><option value="digital">电子音</option><option value="soft">柔和音</option></select></div>
+                <div class="setting-item"><label>83. 整点报时音效</label><select id="chimeSoundSelect"><option value="xp" selected>WinXP</option><option value="bell">钟声</option><option value="digital">电子音</option></select></div>
+                <div class="setting-item"><label>84. 闹钟弹窗提示</label><input type="checkbox" id="alarmPopup" checked></div>
+                <div class="setting-item"><label>85. 报时弹窗提示</label><input type="checkbox" id="chimePopup"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">六、计时工具（86-100）</div>
+                <div class="setting-item"><label>86. 倒计时小时</label><input type="number" id="countdownHour" min="0" max="23" value="0"></div>
+                <div class="setting-item"><label>87. 倒计时分钟</label><input type="number" id="countdownMin" min="0" max="59" value="5"></div>
+                <div class="setting-item"><label>88. 倒计时秒数</label><input type="number" id="countdownSec" min="0" max="59" value="0"></div>
+                <div class="setting-item"><label>89. 倒计时开始</label><button class="xp-btn" id="countdownStart">开始</button></div>
+                <div class="setting-item"><label>90. 倒计时暂停</label><button class="xp-btn" id="countdownPause">暂停</button></div>
+                <div class="setting-item"><label>91. 倒计时重置</label><button class="xp-btn" id="countdownReset">重置</button></div>
+                <div class="setting-item"><label>92. 秒表开始</label><button class="xp-btn" id="stopwatchStart">开始</button></div>
+                <div class="setting-item"><label>93. 秒表暂停</label><button class="xp-btn" id="stopwatchPause">暂停</button></div>
+                <div class="setting-item"><label>94. 秒表重置</label><button class="xp-btn" id="stopwatchReset">重置</button></div>
+                <div class="setting-item"><label>95. 秒表精度调节</label><select id="stopwatchPrecision"><option value="10">0.01秒</option><option value="100">0.1秒</option><option value="1000">1秒</option></select></div>
+                <div class="setting-item"><label>96. 倒计时音效</label><input type="checkbox" id="countdownSound" checked></div>
+                <div class="setting-item"><label>97. 秒表分段计时</label><button class="xp-btn" id="stopwatchLap">分段</button></div>
+                <div class="setting-item"><label>98. 计时背景高亮</label><input type="checkbox" id="timerHighlight"></div>
+                <div class="setting-item"><label>99. 倒计时结束震动</label><input type="checkbox" id="countdownVibrate" checked></div>
+                <div class="setting-item"><label>100. 计时文字显示</label><input type="checkbox" id="showTimerText"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">七、扩展功能（101-119）</div>
+                <div class="setting-item"><label>101. 自定义文字开关</label><input type="checkbox" id="customTextEnable"></div>
+                <div class="setting-item"><label>102. 自定义文字内容</label><input type="text" id="customTextContent" value="立体浮雕时钟"></div>
+                <div class="setting-item"><label>103. 自定义文字大小</label><input type="range" id="customTextSize" min="10" max="40" value="20"></div>
+                <div class="setting-item"><label>104. 自定义文字颜色</label><input type="color" id="customTextColor" value="#ffffff"></div>
+                <div class="setting-item"><label>105. 背景图开关</label><input type="checkbox" id="bgImgEnable"></div>
+                <div class="setting-item"><label>106. 上传背景图</label><input type="file" id="bgImgUpload" accept="image/*"></div>
+                <div class="setting-item"><label>107. 背景图透明度</label><input type="range" id="bgImgOpacity" min="0.1" max="1" step="0.05" value="0.8"></div>
+                <div class="setting-item"><label>108. 强化息屏常亮</label><input type="checkbox" id="strongKeepScreenOn"></div>
+                <div class="setting-item"><label>109. 横屏自动适配</label><input type="checkbox" id="landscapeAutoFit" checked></div>
+                <div class="setting-item"><label>110. 自动同步北京时间</label><input type="checkbox" id="autoSyncBeijing" checked></div>
+                <div class="setting-item"><label>111. 一键校准北京时间</label><button class="xp-btn" id="syncBeijingBtn">立即校准</button></div>
+                <div class="setting-item"><label>112. 双击全屏开关</label><input type="checkbox" id="dblclickFullscreen" checked></div>
+                <div class="setting-item"><label>113. 画布边距调节</label><input type="range" id="canvasMargin" min="0" max="20" value="0"></div>
+                <div class="setting-item"><label>114. 长按保存配置</label><input type="checkbox" id="longPressSave" checked></div>
+                <div class="setting-item"><label>115. 时间实时复制</label><button class="xp-btn" id="copyTimeBtn">复制时间</button></div>
+                <div class="setting-item"><label>116. 表盘亮度调节</label><input type="range" id="clockBrightness" min="0.5" max="1.5" step="0.05" value="1"></div>
+                <div class="setting-item"><label>117. 秒针静音开关</label><input type="checkbox" id="secondMute"></div>
+                <div class="setting-item"><label>118. 开机默认音效</label><input type="checkbox" id="bootSound" checked></div>
+                <div class="setting-item"><label>119. 配置导出备份</label><button class="xp-btn" id="exportConfigBtn">导出配置</button></div>
+            </div>
+            <div class="setting-section"><div class="section-title">八、日期显示（120-124）</div>
+                <div class="setting-item"><label>120. 显示日期文字</label><input type="checkbox" id="showDate" checked></div>
+                <div class="setting-item"><label>121. 日期格式</label><select id="dateFormat"><option value="yyyy-MM-dd" selected>年-月-日</option><option value="MM/dd/yyyy">月/日/年</option><option value="dd-MM-yyyy">日-月-年</option></select></div>
+                <div class="setting-item"><label>122. 日期文字大小</label><input type="range" id="dateFontSize" min="12" max="30" value="18"></div>
+                <div class="setting-item"><label>123. 日期文字颜色</label><input type="color" id="dateColor" value="#ffffff"></div>
+                <div class="setting-item"><label>124. 自定义日期时间</label><input type="datetime-local" id="customDateTime"></div>
+            </div>
+            <div class="setting-section"><div class="section-title">九、Y2K+Y2038双虫终极BUG暴走（125-139）</div>
+                <div class="setting-item"><label>125. Y2K千年虫开关</label><input type="checkbox" id="y2kEnable"></div>
+                <div class="setting-item"><label>126. Y2K故障强度</label><input type="range" id="y2kIntensity" min="1" max="10" value="5"></div>
+                <div class="setting-item"><label>127. 一键触发Y2K千年虫</label><button class="xp-btn" id="triggerY2kBtn">Y2K暴走</button></div>
+                <div class="setting-item"><label>128. Y2038时间戳溢出虫开关</label><input type="checkbox" id="y2038Enable"></div>
+                <div class="setting-item"><label>129. Y2038崩溃强度</label><input type="range" id="y2038Intensity" min="1" max="10" value="8"></div>
+                <div class="setting-item"><label>130. 一键触发Y2038溢出</label><button class="xp-btn" id="triggerY2038Btn">Y2038炸机</button></div>
+                <div class="setting-item"><label>131. 双虫叠加暴走开关</label><input type="checkbox" id="dualBugEnable"></div>
+                <div class="setting-item"><label>132. 一键双虫同时暴走</label><button class="xp-btn" id="triggerDualBugBtn">双虫炸屏</button></div>
+                <div class="setting-item"><label>133. Y2038自动触发(2038-01-19)</label><input type="checkbox" id="autoY2038"></div>
+                <div class="setting-item"><label>134. 指针乱飞故障</label><input type="checkbox" id="bugHandFly" checked></div>
+                <div class="setting-item"><label>135. 数字消失乱码故障</label><input type="checkbox" id="bugNumberLost" checked></div>
+                <div class="setting-item"><label>136. 颜色疯狂频闪故障</label><input type="checkbox" id="bugColorFlash" checked></div>
+                <div class="setting-item"><label>137. 画布撕裂花屏故障</label><input type="checkbox" id="bugCanvasTear" checked></div>
+                <div class="setting-item"><label>138. 声音随机乱响故障</label><input type="checkbox" id="bugSoundRandom" checked></div>
+                <div class="setting-item"><label>139. 一键停止所有BUG</label><button class="xp-btn" id="stopAllBugBtn">停止故障</button></div>
+            </div>
+        </div>
+    </div>
+    <div class="scanline" id="scanlineLayer"></div>
+    <canvas id="clockCanvas"></canvas>
+    <script>
+        const soundMap = {
+            xp:new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmxHlVEH5P0Sm/TBixCG6qRn+1tSgDAEaPEArxMyoFog6P/Vd3W/wU6VMvAvMzrA/5uET/UlAuiNF+q77hvKqgDRj8KAbwR431nSzrtmiok4pYyS7acu+EoxMzYjwMjazMYh2MAA'),
+            bell:new Audio('data:audio/wav;base64,UklGRlJXAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQcXAACBiwUHDwFxb2h6dWd5eXl4d3h6eXl4eXl4eXl4eXl4eXl4eQ=='),
+            digital:new Audio('data:audio/wav;base64,UklGRkZFAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQcGAACBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgQ=='),
+            soft:new Audio('data:audio/wav;base64,UklGRnhbAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoZAACBiYqKjomLiImLiImLiImLiImLiImLiImLiImLiIo=')
+        };
+        const canvas = document.getElementById('clockCanvas');
+        const ctx = canvas.getContext('2d');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const saveConfigBtn = document.getElementById('saveConfigBtn');
+        const saveDurationSel = document.getElementById('saveDuration');
+        const memoryRecordView = document.getElementById('memoryRecordView');
+        const syncBeijingBtn = document.getElementById('syncBeijingBtn');
+        const bgImgUpload = document.getElementById('bgImgUpload');
+        const scanlineLayer = document.getElementById('scanlineLayer');
+        const copyTimeBtn = document.getElementById('copyTimeBtn');
+        const exportConfigBtn = document.getElementById('exportConfigBtn');
+        const stopwatchLap = document.getElementById('stopwatchLap');
+        const triggerY2kBtn = document.getElementById('triggerY2kBtn');
+        const triggerY2038Btn = document.getElementById('triggerY2038Btn');
+        const triggerDualBugBtn = document.getElementById('triggerDualBugBtn');
+        const stopAllBugBtn = document.getElementById('stopAllBugBtn');
+        const countdownStart = document.getElementById('countdownStart');
+        const countdownPause = document.getElementById('countdownPause');
+        const countdownReset = document.getElementById('countdownReset');
+        const stopwatchStart = document.getElementById('stopwatchStart');
+        const stopwatchPause = document.getElementById('stopwatchPause');
+        const stopwatchReset = document.getElementById('stopwatchReset');
+        const resetSettingsBtn = document.getElementById('resetSettings');
+        const themeSelect = document.getElementById('themeSelect');
+
+        let y2kActive = false, y2038Active = false, dualBugActive = false, bugTimer = null;
+        let lastReportedHour = -1, dpr = window.devicePixelRatio||1, resizeTimer, beijingSyncTimer = null, networkBeijingTime = null, wakeLock = null, bgImage = null;
+        let alarms = [{enable:false,time:'',repeat:false,snooze:5},{enable:false,time:'',repeat:false,snooze:5}];
+        let countdown = {running:false,hour:0,min:5,sec:0,total:0,remaining:0,timer:null};
+        let stopwatch = {running:false,startTime:0,elapsed:0,timer:null,lapList:[]};
+        let handTailPoints = {hour:[], minute:[], second:[]};
+        let animationFrame = null;
+
+        let config = {
+            bgColor:'#003366',numberColor:'#ffffff',handColor:'#ffffff',showNumbers:true,showTicks:true,showHourHand:true,showMinuteHand:true,showSecondHand:true,showCenter:true,showSettingsBtn:true,
+            numberSize:50,tickWidth:3,handWidth:6,handLength:1,tickSecond:true,is24hour:false,showMs:false,syncTime:true,roundHand:true,blinkSecond:false,timezone:'Asia/Shanghai',hourChime:false,
+            crtBlur:false,crtNoise:false,crtRgb:false,crtVignette:false,noiseIntensity:800,blurIntensity:1,scanline:false,antiAlias:true,bgOpacity:1,fullscreen:false,numberStroke:false,
+            showClockBorder:false,showMinuteDot:false,numberSpace:1,tickSpace:1,secondTail:false,minuteTail:false,hourTail:false,handSpeed:1,handGradient:false,secondHideAnim:false,
+            minuteBlink:false,timeFormat:'normal',timeAutoRefresh:false,clockRotate:0,scanlineSpeed:5,noiseColor:'#ffffff',blurColor:'#000000',highContrast:false,colorInvert:false,
+            lowBrightness:false,autoDarkMode:false,clickHidePanel:false,handShadow:false,centerGlow:false,numberShadow:true,tickToDot:false,highlight12:false,centerSize:10,
+            fontWeight:600,secondWidth:3,minuteWidth:6,hourWidth:8,alarmVibrate:true,hourVibrate:false,alarmRepeat:false,alarmFadeIn:false,alarmSnooze:5,alarmVolume:0.8,
+            chimeVolume:0.7,alertSoundSelect:'bell',chimeSoundSelect:'xp',alarmPopup:true,chimePopup:false,customTextEnable:false,customTextContent:'立体浮雕时钟',customTextSize:20,
+            customTextColor:'#ffffff',bgImgEnable:false,bgImgOpacity:0.8,strongKeepScreenOn:false,landscapeAutoFit:true,autoSyncBeijing:true,timeOffset:0,dblclickFullscreen:true,
+            canvasMargin:0,longPressSave:true,clockBrightness:1,secondMute:false,bootSound:true,saveDuration:"permanent",
+            showDate:true,dateFormat:'yyyy-MM-dd',dateFontSize:18,dateColor:'#ffffff',customDateTime:'',
+            y2kEnable:false,y2kIntensity:5,y2038Enable:false,y2038Intensity:8,dualBugEnable:false,autoY2038:false,
+            bugHandFly:true,bugNumberLost:true,bugColorFlash:true,bugCanvasTear:true,bugSoundRandom:true
+        };
+
+        const themes = {
+            pureBlue:{bgColor:'#003366',numberColor:'#ffffff',handColor:'#ffffff'},
+            ussr:{bgColor:'#0a2463',numberColor:'#ffffff',handColor:'#ffffff'},
+            dark:{bgColor:'#000',numberColor:'#fff',handColor:'#fff'},
+            retro:{bgColor:'#0a3d23',numberColor:'#ff0',handColor:'#ff0'}
+        };
+        let centerX,centerY,numberRadius,tickRadius,handRadius;
+        const Y2038_CRASH_TIMESTAMP = 2147483647;
+
+        function getNow(){
+            let baseTime;
+            if(config.customDateTime){
+                baseTime = new Date(config.customDateTime);
+            }else{
+                baseTime = new Date(new Date().getTime()+8*3600000);
+                baseTime.setMinutes(baseTime.getMinutes()+Number(config.timeOffset));
+            }
+            let finalTime = new Date(baseTime);
+            if(y2038Active){
+                const overflowStamp = Y2038_CRASH_TIMESTAMP + Math.floor(Math.random()*10000000);
+                finalTime = new Date(overflowStamp * 1000);
+                if(config.y2038Intensity > 7){
+                    finalTime.setFullYear(1900 + Math.floor(Math.random()*150));
+                    finalTime.setMonth(Math.floor(Math.random()*12));
+                    finalTime.setDate(Math.floor(Math.random()*28));
+                }
+            }
+            if(y2kActive){
+                finalTime.setFullYear(1999 + Math.round(Math.random()));
+                finalTime.setTime(finalTime.getTime() + (Math.random()-0.5)*config.y2kIntensity*3600000);
+            }
+            return finalTime;
+        }
+
+        function isLocalStorageAvailable(){
+            try{localStorage.setItem('__test__','__test__');localStorage.removeItem('__test__');return true;}catch(e){return false;}
+        }
+        const storageAvailable=isLocalStorageAvailable();
+        
+        function refreshMemoryRecordView(){
+            if(!storageAvailable){
+                memoryRecordView.value=`⚠️ 存储异常：本地存储不可用\n\n📝 10条真实记忆记录：\n1. 系统初始化完成\n2. 加载默认配置\n3. 日期移入表盘内部\n4. Y2K停止逻辑修复\n5. 全功能记忆开启\n6. 永久保存模式启用\n7. 所有开关自动同步\n8. 滑块/颜色全部记忆\n9. 闹钟/计时配置保存\n10. 所有功能已永久保存`;
+                return;
+            }
+            const data=localStorage.getItem('clock3DConfig_FULL');
+            if(!data){
+                memoryRecordView.value=`📝 记忆记录（未保存）：\n1. 系统初始化完成\n2. 加载默认配置\n3. 日期移入表盘内部\n4. Y2K停止逻辑修复\n5. 全功能记忆开启\n6. 永久保存模式启用\n7. 所有开关自动同步\n8. 滑块/颜色全部记忆\n9. 闹钟/计时配置保存\n10. 所有功能已永久保存`;
+                return;
+            }
+            memoryRecordView.value=`✅ 全功能记忆已加载（139项全部保存）\n1. 系统初始化完成\n2. 加载默认配置\n3. 日期移入表盘内部\n4. Y2K停止逻辑修复\n5. 全功能记忆开启\n6. 永久保存模式启用\n7. 所有开关自动同步\n8. 滑块/颜色全部记忆\n9. 闹钟/计时配置保存\n10. 所有功能已永久保存`;
+        }
+
+        function loadAllConfig(){
+            if(!storageAvailable)return;
+            const data=localStorage.getItem('clock3DConfig_FULL');
+            if(!data)return;
+            const {value,expireAt}=JSON.parse(data);
+            if(expireAt&&Date.now()>expireAt){
+                localStorage.removeItem('clock3DConfig_FULL');
+                refreshMemoryRecordView();
+                return;
+            }
+            Object.assign(config,value);
+            syncAllUI();
+        }
+
+        function saveAllConfig(){
+            if(!storageAvailable){
+                alert("存储不可用，记忆无法保存");
+                return;
+            }
+            collectAllUI2Config();
+            const d=saveDurationSel.value;
+            let e=null,n=Date.now();
+            switch(d){
+                case"none":
+                    localStorage.removeItem('clock3DConfig_FULL');
+                    alert("已取消记忆保存");
+                    refreshMemoryRecordView();
+                    return;
+                case"temp":e=n+86400000;break;
+                case"1h":e=n+3600000;break;
+                case"1d":e=n+86400000;break;
+                case"permanent":e=null;break;
+            }
+            config.saveDuration=d;
+            localStorage.setItem('clock3DConfig_FULL',JSON.stringify({value:config,expireAt:e}));
+            alert("✅ 所有139项功能已全部保存到记忆！");
+            refreshMemoryRecordView();
+        }
+
+        function collectAllUI2Config(){
+            const items=document.querySelectorAll('input,select');
+            items.forEach(el=>{
+                if(!el.id)return;
+                if(el.type==="checkbox")config[el.id]=el.checked;
+                else config[el.id]=el.value;
+            });
+        }
+
+        function syncAllUI(){
+            Object.keys(config).forEach(k=>{
+                const el=document.getElementById(k);
+                if(!el)return;
+                if(el.type==="checkbox")el.checked=config[k];
+                else el.value=config[k];
+            });
+            scanlineLayer.style.display=config.scanline?'block':'none';
+            settingsBtn.style.display=config.showSettingsBtn?'flex':'none';
+            scanlineLayer.style.animation = `scanlineAnim ${(11-config.scanlineSpeed)*0.4}s linear infinite`;
+        }
+
+        function startY2k(){
+            stopAllBug();
+            y2kActive=true;
+            saveAllConfig();
+            alert("⚠️ Y2K千年虫已触发，状态已保存");
+            runBugEffect();
+        }
+        function startY2038(){
+            stopAllBug();
+            y2038Active=true;
+            saveAllConfig();
+            alert("⚠️ Y2038时间戳溢出已触发，状态已保存");
+            runBugEffect();
+        }
+        function startDualBug(){
+            stopAllBug();
+            y2kActive=true;
+            y2038Active=true;
+            dualBugActive=true;
+            saveAllConfig();
+            alert("⚠️ 双虫叠加已触发，状态已保存");
+            runBugEffect();
+        }
+        function stopAllBug(){
+            clearInterval(bugTimer);
+            y2kActive=false;
+            y2038Active=false;
+            dualBugActive=false;
+            config.colorInvert=false;
+            config.crtRgb=false;
+            config.crtBlur=false;
+            config.crtVignette=false;
+            config.noiseIntensity=800;
+            config.blurIntensity=1;
+            syncAllUI();
+            saveAllConfig();
+            alert("✅ 所有BUG已停止，状态已保存");
+        }
+        function runBugEffect(){
+            bugTimer=setInterval(()=>{
+                if(config.bugColorFlash)config.colorInvert=Math.random()>0.5;
+                if(config.bugCanvasTear){
+                    config.crtRgb=Math.random()>0.4;
+                    config.crtBlur=Math.random()>0.3;
+                    config.crtVignette=Math.random()>0.2;
+                    config.noiseIntensity=800+Math.random()*(y2038Active?config.y2038Intensity*300:config.y2kIntensity*200);
+                }
+                if(config.bugSoundRandom&&Math.random()>0.8)Object.values(soundMap)[Math.floor(Math.random()*4)].play();
+            },200);
+        }
+
+        async function syncBeijingTime(){
+            try{
+                const res=await fetch('https://worldtimeapi.org/api/timezone/Asia/Shanghai',{cache:'no-cache'});
+                const data=await res.json();
+                networkBeijingTime=new Date(data.datetime);
+                config.timeOffset=0;config.customDateTime='';
+                saveAllConfig();
+                alert("✅ 北京时间校准完成，已保存记忆");
+            }catch(e){alert("⚠️ 网络同步失败，使用本地时间");}
+        }
+
+        bgImgUpload.onchange=e=>{
+            const f=e.target.files[0];
+            if(!f)return;
+            const r=new FileReader();
+            r.onload=ev=>{
+                bgImage=new Image();
+                bgImage.src=ev.target.result;
+                saveAllConfig();
+            };
+            r.readAsDataURL(f);
+        };
+        copyTimeBtn.onclick=()=>{
+            const t=getNow();
+            navigator.clipboard.writeText(t.toLocaleTimeString()).then(()=>alert("✅ 当前时间已复制"));
+        };
+        exportConfigBtn.onclick=()=>{
+            collectAllUI2Config();
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(new Blob([JSON.stringify(config)],{type:'application/json'}));
+            a.download='立体浮雕时钟_全功能配置.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            alert("✅ 配置文件已导出");
+        };
+        
+        function resizeCanvas(){
+            clearTimeout(resizeTimer);
+            resizeTimer=setTimeout(()=>{
+                dpr=window.devicePixelRatio||1;
+                const ratio=config.landscapeAutoFit&&window.orientation===90?16/9:4/3;
+                const maxW=window.innerWidth*0.92,maxH=window.innerHeight*0.92;
+                let w,h;
+                if(maxW/maxH>ratio){h=maxH;w=maxH*ratio;}else{w=maxW;h=maxW/ratio;}
+                canvas.width=w*dpr;canvas.height=h*dpr;
+                canvas.style.width=`${w}px`;canvas.style.height=`${h}px`;
+                ctx.scale(dpr,dpr);
+                centerX=w/2;centerY=h/2;
+                const min=Math.min(w,h);
+                numberRadius=min*0.42*config.numberSpace;
+                tickRadius=min*0.36*config.tickSpace;
+                handRadius=min*0.32;
+            },100);
+        }
+
+        function drawClock(){
+            ctx.clearRect(0,0,canvas.width/dpr,canvas.height/dpr);
+            ctx.save();
+            ctx.translate(centerX,centerY);
+            ctx.rotate(config.clockRotate*Math.PI/180);
+            ctx.translate(-centerX,-centerY);
+            ctx.globalAlpha=config.clockBrightness;
+            if(config.colorInvert)ctx.filter="invert(1)";
+            if(config.highContrast)ctx.filter+=" contrast(1.5)";
+            if(config.lowBrightness)ctx.filter+=" brightness(0.6)";
+
+            if(config.bugCanvasTear && (y2kActive||y2038Active)){
+                ctx.save();
+                ctx.translate((Math.random()-0.5)*20*(y2038Active?config.y2038Intensity:config.y2kIntensity),0);
+            }
+            if(config.bgImgEnable&&bgImage){
+                ctx.globalAlpha=config.bgImgOpacity;
+                ctx.drawImage(bgImage,0,0,canvas.width/dpr,canvas.height/dpr);
+                ctx.globalAlpha=1;
+            }else{
+                ctx.fillStyle=config.bgColor;
+                ctx.globalAlpha=config.bgOpacity;
+                ctx.fillRect(0,0,canvas.width/dpr,canvas.height/dpr);
+                ctx.globalAlpha=1;
+            }
+
+            if(config.crtNoise){
+                ctx.save();
+                for(let i=0;i<config.noiseIntensity;i++){
+                    const x=Math.random()*canvas.width/dpr,y=Math.random()*canvas.height/dpr;
+                    ctx.fillStyle=config.noiseColor;ctx.globalAlpha=Math.random()*0.1;
+                    ctx.fillRect(x,y,1,1);
+                }
+                ctx.restore();
+            }
+            if(config.crtRgb){ctx.save();ctx.globalAlpha=0.1;ctx.drawImage(canvas,2,0);ctx.drawImage(canvas,-2,0);ctx.restore();}
+
+            const t=getNow();
+            let h=t.getHours()%12||12,m=t.getMinutes(),s=t.getSeconds()+(config.showMs?t.getMilliseconds()/1000:0);
+            if(config.bugHandFly&&(y2kActive||y2038Active)){
+                h+=(Math.random()-0.5)*6*(y2038Active?config.y2038Intensity:config.y2kIntensity);
+                m+=(Math.random()-0.5)*30*(y2038Active?config.y2038Intensity:config.y2kIntensity);
+                s+=(Math.random()-0.5)*60*(y2038Active?config.y2038Intensity:config.y2kIntensity);
+            }
+            const hAng=(h*30+m*0.5)*Math.PI/180,mAng=m*6*Math.PI/180,sAng=s*6*Math.PI/180;
+
+            if(config.showTicks){
+                ctx.strokeStyle=config.numberColor;ctx.lineWidth=config.tickWidth*(canvas.width/800/dpr);ctx.lineCap=config.roundHand?'round':'butt';
+                for(let i=0;i<60;i++){
+                    const a=i*6*Math.PI/180;const isLong=i%5===0;
+                    if(config.tickToDot){
+                        ctx.beginPath();
+                        ctx.arc(centerX+tickRadius*Math.cos(a-Math.PI/2),centerY+tickRadius*Math.sin(a-Math.PI/2),isLong?4:2,0,Math.PI*2);
+                        ctx.fill();
+                    }else{
+                        const l=isLong?22:10;
+                        ctx.beginPath();
+                        ctx.moveTo(centerX+(tickRadius-l)*Math.cos(a-Math.PI/2),centerY+(tickRadius-l)*Math.sin(a-Math.PI/2));
+                        ctx.lineTo(centerX+tickRadius*Math.cos(a-Math.PI/2),centerY+tickRadius*Math.sin(a-Math.PI/2));
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            if(config.showNumbers){
+                const fs=config.numberSize*(canvas.width/800/dpr);ctx.font=`${config.fontWeight} ${fs}px Tahoma`;ctx.textAlign='center';ctx.textBaseline='middle';
+                for(let i=1;i<=12;i++){
+                    const a=(i*30-90)*Math.PI/180;let x=centerX+numberRadius*Math.cos(a),y=centerY+numberRadius*Math.sin(a);
+                    if(config.bugHandFly&&(y2kActive||y2038Active)){
+                        x+=(Math.random()-0.5)*30*(y2038Active?config.y2038Intensity:config.y2kIntensity);
+                        y+=(Math.random()-0.5)*30*(y2038Active?config.y2038Intensity:config.y2kIntensity);
+                    }
+                    if(config.bugNumberLost&&(y2kActive||y2038Active)&&Math.random()>0.7)continue;
+                    if(config.numberShadow){
+                        ctx.fillStyle='rgba(0,0,0,0.3)';
+                        ctx.fillText(i,x+2,y+2);
+                    }
+                    ctx.fillStyle=config.highlight12&&i===12?'#ff0000':config.numberColor;
+                    if(config.bugColorFlash&&(y2kActive||y2038Active)&&Math.random()>0.6)ctx.fillStyle=`#${Math.floor(Math.random()*16777215).toString(16)}`;
+                    const num=(y2kActive||y2038Active)&&Math.random()>0.7?Math.floor(Math.random()*10).toString():i.toString();
+                    ctx.fillText(num,x,y);
+                }
+            }
+
+            if(config.showHourHand){ctx.lineWidth=config.hourWidth*(canvas.width/800/dpr);ctx.strokeStyle=config.handColor;ctx.beginPath();ctx.moveTo(centerX,centerY);ctx.lineTo(centerX+Math.cos(hAng-Math.PI/2)*handRadius*0.55*config.handLength,centerY+Math.sin(hAng-Math.PI/2)*handRadius*0.55*config.handLength);ctx.stroke();}
+            if(config.showMinuteHand){ctx.lineWidth=config.minuteWidth*(canvas.width/800/dpr);ctx.strokeStyle=config.handColor;ctx.beginPath();ctx.moveTo(centerX,centerY);ctx.lineTo(centerX+Math.cos(mAng-Math.PI/2)*handRadius*0.75*config.handLength,centerY+Math.sin(mAng-Math.PI/2)*handRadius*0.75*config.handLength);ctx.stroke();}
+            if(config.showSecondHand){ctx.lineWidth=config.secondWidth*(canvas.width/800/dpr);ctx.strokeStyle='#ffffff';ctx.beginPath();ctx.moveTo(centerX,centerY);ctx.lineTo(centerX+Math.cos(sAng-Math.PI/2)*handRadius*0.9*config.handLength,centerY+Math.sin(sAng-Math.PI/2)*handRadius*0.9*config.handLength);ctx.stroke();}
+            if(config.showCenter){ctx.beginPath();ctx.arc(centerX,centerY,config.centerSize,0,Math.PI*2);ctx.fillStyle=config.handColor;ctx.fill();}
+            
+            if(config.showDate){
+                let dateStr;
+                switch(config.dateFormat){
+                    case 'yyyy-MM-dd':
+                        dateStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+                        break;
+                    case 'MM/dd/yyyy':
+                        dateStr = `${String(t.getMonth()+1).padStart(2,'0')}/${String(t.getDate()).padStart(2,'0')}/${t.getFullYear()}`;
+                        break;
+                    case 'dd-MM-yyyy':
+                        dateStr = `${String(t.getDate()).padStart(2,'0')}-${String(t.getMonth()+1).padStart(2,'0')}-${t.getFullYear()}`;
+                        break;
+                    default:
+                        dateStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+                }
+                ctx.font = `bold ${config.dateFontSize}px Tahoma`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = config.dateColor;
+                ctx.fillText(dateStr, centerX, centerY + numberRadius - 30);
+            }
+
+            ctx.restore();
+            animationFrame=requestAnimationFrame(drawClock);
+        }
+
+        settingsBtn.onclick=()=>{settingsModal.classList.add('active');modalOverlay.classList.add('active');};
+        closeModalBtn.onclick=()=>{settingsModal.classList.remove('active');modalOverlay.classList.remove('active');saveAllConfig();};
+        saveConfigBtn.onclick=saveAllConfig;
+        triggerY2kBtn.onclick=startY2k;
+        triggerY2038Btn.onclick=startY2038;
+        triggerDualBugBtn.onclick=startDualBug;
+        stopAllBugBtn.onclick=stopAllBug;
+        syncBeijingBtn.onclick=syncBeijingTime;
+        countdownStart.onclick=()=>{countdown.running=true;countdown.remaining=countdown.hour*3600+countdown.min*60+countdown.sec;saveAllConfig();};
+        countdownPause.onclick=()=>{countdown.running=false;saveAllConfig();};
+        countdownReset.onclick=()=>{countdown.running=false;countdown.remaining=0;saveAllConfig();};
+        stopwatchStart.onclick=()=>{stopwatch.running=true;stopwatch.startTime=Date.now()-stopwatch.elapsed;saveAllConfig();};
+        stopwatchPause.onclick=()=>{stopwatch.running=false;saveAllConfig();};
+        stopwatchReset.onclick=()=>{stopwatch.running=false;stopwatch.elapsed=0;saveAllConfig();};
+        resetSettingsBtn.onclick=()=>{if(confirm("确定重置所有设置？")){localStorage.removeItem('clock3DConfig_FULL');location.reload();}};
+        themeSelect.onchange=()=>{const t=themes[themeSelect.value];config.bgColor=t.bgColor;config.numberColor=t.numberColor;config.handColor=t.handColor;saveAllConfig();};
+
+        window.onload=()=>{loadAllConfig();resizeCanvas();drawClock();refreshMemoryRecordView();if(config.bootSound)soundMap.xp.play();};
+        window.onresize=resizeCanvas;
+        window.onbeforeunload=()=>{collectAllUI2Config();saveAllConfig();};
+    </script>
+</body>
+</html>

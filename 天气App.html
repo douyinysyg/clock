@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>全功能豪华天气系统-超详细错误处理版</title>
+  <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Microsoft Yahei", sans-serif;
+      transition: all 0.4s ease;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 20px 0;
+      background: linear-gradient(135deg, #4facfe, #00f2fe);
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    body.night { background: linear-gradient(135deg, #1a1a40, #0d0d2b); }
+    body.rain { background: linear-gradient(135deg, #485563, #29323c); }
+    body.snow { background: linear-gradient(135deg, #e0eafc, #cfdef3); }
+    body.cloud { background: linear-gradient(135deg, #89a0b9, #b1c3d8); }
+    body.haze { background: linear-gradient(135deg, #b8c6db, #f5f7fa); }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .weather-container {
+      width: 95%;
+      max-width: 680px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .main-card {
+      padding: 35px;
+      border-radius: 30px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.3);
+      color: #fff;
+      margin-bottom: 20px;
+    }
+
+    .top-operate {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .func-btn {
+      padding: 8px 16px;
+      border-radius: 18px;
+      border: none;
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+
+    .func-btn:hover {
+      background: rgba(255,255,255,0.4);
+    }
+
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      margin-bottom: 25px;
+    }
+
+    .city-name { font-size: 24px; font-weight: 600; }
+    .real-time { font-size: 18px; letter-spacing: 1px; }
+
+    .tip-box {
+      text-align: center;
+      padding: 30px 0;
+      font-size: 16px;
+    }
+    /* 错误信息专属样式 */
+    .error-detail-box {
+      margin: 15px 0;
+      padding: 15px;
+      background: rgba(220, 50, 50, 0.2);
+      border-radius: 15px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .error-code {
+      font-weight: bold;
+      color: #ffcccc;
+    }
+
+    .weather-core {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      margin: 20px 0 30px;
+    }
+
+    .temp { font-size: 80px; font-weight: bold; line-height: 1; }
+    .temp-hot { color: #ff6b6b; }
+    .temp-cold { color: #48dbfb; }
+    .weather-text { font-size: 26px; margin-top: 10px; }
+    .weather-icon { font-size: 75px; }
+
+    .big-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 25px;
+    }
+
+    .grid-card {
+      background: rgba(255,255,255,0.1);
+      padding: 15px 8px;
+      border-radius: 16px;
+      text-align: center;
+    }
+
+    .grid-label {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-bottom: 5px;
+    }
+
+    .grid-value {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .module-title {
+      font-size: 18px;
+      margin: 25px 0 12px;
+      padding-left: 8px;
+      border-left: 4px solid #ffffff;
+    }
+
+    .forecast-scroll {
+      display: flex;
+      overflow-x: auto;
+      gap: 10px;
+      padding: 10px 0;
+    }
+
+    .forecast-scroll::-webkit-scrollbar { height: 4px; }
+    .forecast-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 2px; }
+
+    .forecast-item {
+      min-width: 90px;
+      padding: 15px 5px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 16px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .index-wrap {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .air-quality {
+      padding: 15px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 16px;
+      margin: 10px 0;
+    }
+
+    .search-area {
+      display: flex;
+      gap: 12px;
+      margin-top: 25px;
+    }
+
+    #cityInput {
+      flex: 1;
+      padding: 14px 18px;
+      border-radius: 22px;
+      border: none;
+      outline: none;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 16px;
+    }
+
+    #cityInput::placeholder { color: rgba(255,255,255,0.6); }
+
+    .update-info {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 13px;
+      opacity: 0.7;
+    }
+
+    .weather-tips {
+      margin-top: 15px;
+      padding: 12px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 12px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="effectCanvas"></canvas>
+  <div class="weather-container">
+    <div class="main-card">
+      <div class="top-operate">
+        <div>
+          <button class="func-btn" onclick="getIpLocationWeather()">
+            <i class="fas fa-map-marker-alt"></i> 定位城市
+          </button>
+          <button class="func-btn" onclick="manualRefresh()">
+            <i class="fas fa-sync-alt"></i> 手动刷新
+          </button>
+        </div>
+        <button class="func-btn" onclick="fullScreenToggle()">
+          <i class="fas fa-expand"></i> 全屏显示
+        </button>
+      </div>
+
+      <div class="top-row">
+        <div class="city-name" id="cityName">加载中...</div>
+        <div class="real-time" id="clock">00:00:00</div>
+      </div>
+
+      <div class="tip-box" id="tipBox">正在获取实时天气数据...</div>
+      <!-- 详细错误信息展示区域 -->
+      <div class="error-detail-box" id="errorBox" style="display:none;"></div>
+
+      <div class="weather-core" id="weatherCore">
+        <div>
+          <div class="temp" id="tempNum">--°C</div>
+          <div class="weather-text" id="weatherDesc">--</div>
+        </div>
+        <div class="weather-icon" id="weatherIcon"><i class="fas fa-sun"></i></div>
+      </div>
+
+      <div class="big-grid" id="baseInfoGrid">
+        <div class="grid-card">
+          <div class="grid-label">体感温度</div>
+          <div class="grid-value" id="feelTemp">--°C</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">空气湿度</div>
+          <div class="grid-value" id="humidity">--%</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">气压</div>
+          <div class="grid-value" id="airPressure">--hPa</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">能见度</div>
+          <div class="grid-value" id="visibility">--km</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">风向</div>
+          <div class="grid-value" id="windDir">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">风力等级</div>
+          <div class="grid-value" id="windLevel">--级</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">风速</div>
+          <div class="grid-value" id="windSpeed">--m/s</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">紫外线强度</div>
+          <div class="grid-value" id="uvLevel">--</div>
+        </div>
+      </div>
+
+      <h3 class="module-title">日出日落信息</h3>
+      <div class="big-grid" style="grid-template-columns: repeat(2,1fr)">
+        <div class="grid-card">
+          <div class="grid-label">日出时间</div>
+          <div class="grid-value" id="sunRise">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">日落时间</div>
+          <div class="grid-value" id="sunSet">--</div>
+        </div>
+      </div>
+
+      <h3 class="module-title">空气质量监测</h3>
+      <div class="air-quality" id="airBox">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+          <span>AQI指数：<span id="aqiNum">--</span></span>
+          <span>污染等级：<span id="aqiLevel">--</span></span>
+        </div>
+        <div style="display:flex;gap:20px;">
+          <span>PM2.5：<span id="pm25">--</span></span>
+          <span>PM10：<span id="pm10">--</span></span>
+        </div>
+      </div>
+
+      <h3 class="module-title">未来多日天气预报</h3>
+      <div class="forecast-scroll" id="forecastList"></div>
+
+      <h3 class="module-title">生活出行指数</h3>
+      <div class="index-wrap">
+        <div class="grid-card">
+          <div class="grid-label">穿衣指数</div>
+          <div class="grid-value" id="dressIndex">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">洗车指数</div>
+          <div class="grid-value" id="washIndex">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">运动指数</div>
+          <div class="grid-value" id="sportIndex">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">感冒指数</div>
+          <div class="grid-value" id="coldIndex">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">防晒指数</div>
+          <div class="grid-value" id="sunIndex">--</div>
+        </div>
+        <div class="grid-card">
+          <div class="grid-label">晾晒指数</div>
+          <div class="grid-value" id="dryIndex">--</div>
+        </div>
+      </div>
+
+      <div class="weather-tips" id="weatherTips">
+        天气小贴士：等待数据加载完成后展示出行建议
+      </div>
+
+      <div class="search-area">
+        <input type="text" id="cityInput" placeholder="输入城市名精准查询天气">
+        <button class="func-btn" onclick="searchWeather()">查询天气</button>
+        <button class="func-btn" onclick="voiceBroadcast()">语音播报</button>
+      </div>
+
+      <div class="update-info">
+        数据更新时间：<span id="updateTime">--</span> | 自动刷新间隔：30秒
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://uapis.cn/api/v1/misc/weather";
+    const REFRESH_INTERVAL = 30000;
+    const REQUEST_TIMEOUT = 8000; // 请求超时8秒判定
+    let currentCity = "北京";
+    let refreshTimer = null;
+    let rainSnowArr = [];
+    let canvas, ctx;
+
+    // 超全错误码枚举（含Edge/安卓/本地文件场景）
+    const ERROR_CODE = {
+      // ========== HTTP状态码错误 ==========
+      HTTP_400: {
+        code:400,msg:"请求参数错误",
+        reason:"城市名称格式非法、参数缺失或符号违规",
+        solve:"删除特殊符号，输入纯中文城市名重试"
+      },
+      HTTP_404: {
+        code:404,msg:"接口地址不存在",
+        reason:"API接口路径失效或被修改",
+        solve:"检查接口地址是否正确，或等待接口恢复"
+      },
+      HTTP_410: {
+        code:410,msg:"地区无天气数据",
+        reason:"该城市/区县暂未收录气象信息",
+        solve:"更换市级城市名称查询，如输入“平顶山”而非“汝州”"
+      },
+      HTTP_429: {
+        code:429,msg:"请求频次超出限制",
+        reason:"短时间查询次数过多被临时限制",
+        solve:"等待1分钟后再次刷新查询，或降低自动刷新频率"
+      },
+      HTTP_500: {
+        code:500,msg:"服务器内部异常",
+        reason:"接口服务程序运行出错",
+        solve:"稍后手动刷新重试，或检查接口是否维护中"
+      },
+      HTTP_502: {
+        code:502,msg:"网关转发失败",
+        reason:"服务器链路通信中断",
+        solve:"切换网络（如WiFi换流量）后重试"
+      },
+      HTTP_503: {
+        code:503,msg:"服务暂时不可用",
+        reason:"接口服务器维护、负载过高或限流",
+        solve:"间隔一段时间再尝试访问，或更换网络环境"
+      },
+
+      // ========== 网络与跨域错误（重点针对Edge/安卓） ==========
+      NET_OFFLINE: {
+        code:1001,msg:"网络连接断开",
+        reason:"设备未联网、WiFi/流量中断或信号差",
+        solve:"检查网络连接，切换稳定的WiFi或移动数据后重试"
+      },
+      NET_TIMEOUT: {
+        code:1002,msg:"请求超时无响应",
+        reason:"网络延迟过高、服务器响应缓慢或被防火墙拦截",
+        solve:"切换网络环境，或等待网络恢复后刷新"
+      },
+      FILE_PROTOCOL_CORS: {
+        code:1003,msg:"本地文件跨域访问被拦截",
+        reason:"你正在用file:///content://协议打开HTML文件，浏览器安全策略禁止向外部API发起请求（Edge/安卓浏览器限制尤其严格）",
+        solve:"1. 电脑端：用本地服务器运行HTML文件；2. 手机端：将文件上传到在线预览平台，或使用Chrome/QQ浏览器打开"
+      },
+      EDGE_ENHANCED_SECURITY: {
+        code:1004,msg:"Edge增强安全防护拦截请求",
+        reason:"Edge浏览器的增强安全防护功能阻止了API请求",
+        solve:"1. 临时关闭Edge的增强安全防护；2. 或更换Chrome/QQ浏览器打开"
+      },
+      ANDROID_WEBVIEW_BLOCK: {
+        code:1005,msg:"安卓浏览器/ WebView请求被拦截",
+        reason:"安卓系统对本地文件的网络请求限制，部分浏览器（如Edge）会强制拦截跨域请求",
+        solve:"1. 更换安卓自带浏览器或Chrome浏览器；2. 将HTML文件上传到在线平台后访问"
+      },
+      PROXY_FIREWALL_BLOCK: {
+        code:1006,msg:"代理/防火墙拦截请求",
+        reason:"你正在使用VPN/代理，或网络防火墙拦截了API请求",
+        solve:"关闭VPN/代理，切换到普通网络环境后重试"
+      },
+
+      // ========== 数据处理错误 ==========
+      JSON_PARSE: {
+        code:2001,msg:"返回数据格式损坏",
+        reason:"接口返回非标准JSON数据，或网络中断导致数据不完整",
+        solve:"刷新页面重新获取数据，或检查网络稳定性"
+      },
+      DATA_EMPTY: {
+        code:2002,msg:"无任何气象数据返回",
+        reason:"查询结果为空数据集，或城市名称识别失败",
+        solve:"确认城市名称正确性，更换市级城市重试"
+      },
+      FIELD_LOSS: {
+        code:2003,msg:"核心天气字段缺失",
+        reason:"数据部分模块加载异常，API未返回必要字段",
+        solve:"单次重新查询当前城市，或稍后再试"
+      },
+
+      // ========== 浏览器功能与权限错误 ==========
+      VOICE_FAIL: {
+        code:3001,msg:"语音播报功能异常",
+        reason:"浏览器不支持语音合成，或权限被拦截",
+        solve:"更换Chrome/Edge浏览器，或检查浏览器的麦克风/语音权限设置"
+      },
+      FULLSCREEN_FAIL: {
+        code:3002,msg:"全屏模式调用失败",
+        reason:"页面权限限制、浏览器拦截或当前环境不支持全屏",
+        solve:"手动右键开启全屏查看，或更换浏览器"
+      },
+      LOCATION_FAIL: {
+        code:4001,msg:"IP定位获取失败",
+        reason:"网络屏蔽定位接口、IP归属地未知或定位服务被禁用",
+        solve:"手动输入城市名称查询，或开启设备定位权限"
+      },
+      BROWSER_OUTDATED: {
+        code:4002,msg:"浏览器版本过低",
+        reason:"当前浏览器不支持Fetch API等现代特性，无法发起请求",
+        solve:"更新浏览器到最新版本，或更换Chrome/Edge浏览器"
+      },
+
+      // ========== 未知错误兜底 ==========
+      UNKNOWN_ERROR: {
+        code:9999,msg:"未知异常",
+        reason:"未归类的突发故障，可能是浏览器、网络或接口的临时问题",
+        solve:"1. 刷新页面重试；2. 更换浏览器；3. 切换网络环境；4. 检查是否开启VPN/代理"
+      }
+    };
+
+    window.onload = function () {
+      initCanvasEffect();
+      startClock();
+      // 页面加载时先检测运行环境，提前提示问题
+      checkRunningEnvironment();
+      getWeatherData(currentCity);
+      startAutoRefresh();
+    };
+
+    // 检测运行环境，提前判断本地文件跨域问题
+    function checkRunningEnvironment() {
+      const protocol = window.location.protocol;
+      const userAgent = navigator.userAgent;
+      const isEdge = userAgent.includes("Edg");
+      const isFileProtocol = protocol === "file:" || protocol === "content:";
+
+      // 如果是本地文件协议，提前给出提示
+      if (isFileProtocol) {
+        showErrorInfo(ERROR_CODE.FILE_PROTOCOL_CORS);
+        // 如果是Edge浏览器，额外提示
+        if (isEdge) {
+          document.getElementById("tipBox").innerText = "Edge浏览器本地文件跨域限制，无法请求API";
+        }
+      }
+    }
+
+    // 雨雪粒子动画初始化
+    function initCanvasEffect() {
+      canvas = document.getElementById("effectCanvas");
+      ctx = canvas.getContext("2d");
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+      setInterval(drawEffect, 30);
+    }
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    function drawEffect() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      rainSnowArr.forEach((item, index) => {
+        item.y += item.speed;
+        item.x += item.slope;
+        ctx.beginPath();
+        ctx.fillStyle = item.type === "rain" ? "rgba(200,220,255,0.6)" : "rgba(255,255,255,0.7)";
+        ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+        ctx.fill();
+        if (item.y > canvas.height) rainSnowArr.splice(index, 1);
+      });
+    }
+
+    function createRain() {
+      for(let i=0;i<80;i++){
+        rainSnowArr.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * -canvas.height,
+          speed: Math.random() * 3 + 2,
+          slope: Math.random() * 1 - 0.5,
+          radius: 1,
+          type: "rain"
+        });
+      }
+    }
+
+    function createSnow() {
+      for(let i=0;i<60;i++){
+        rainSnowArr.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * -canvas.height,
+          speed: Math.random() * 1.5 + 0.5,
+          slope: Math.random() * 0.8 - 0.4,
+          radius: Math.random() * 2 + 1,
+          type: "snow"
+        });
+      }
+    }
+
+    // 实时时钟
+    function startClock() {
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    function updateClock() {
+      const d = new Date();
+      let h = String(d.getHours()).padStart(2, "0");
+      let m = String(d.getMinutes()).padStart(2, "0");
+      let s = String(d.getSeconds()).padStart(2, "0");
+      document.getElementById("clock").innerText = `${h}:${m}:${s}`;
+      setDayNightBg(Number(h));
+    }
+
+    function setDayNightBg(hour) {
+      document.body.className = "";
+      if (hour < 6 || hour >= 19) document.body.classList.add("night");
+    }
+
+    function setWeatherBg(weatherText) {
+      const w = weatherText || "";
+      document.body.className = "";
+      if (w.includes("雨")) {
+        document.body.classList.add("rain");
+        createRain();
+      } else if (w.includes("雪")) {
+        document.body.classList.add("snow");
+        createSnow();
+      } else if (w.includes("云") || w.includes("阴")) {
+        document.body.classList.add("cloud");
+      } else if (w.includes("雾") || w.includes("霾")) {
+        document.body.classList.add("haze");
+      }
+    }
+
+    function getWeatherIcon(weatherText) {
+      const w = weatherText || "";
+      if (w.includes("晴")) return "fas fa-sun";
+      if (w.includes("云") || w.includes("阴")) return "fas fa-cloud";
+      if (w.includes("雨")) return "fas fa-cloud-rain";
+      if (w.includes("雪")) return "fas fa-snowflake";
+      if (w.includes("雾") || w.includes("霾")) return "fas fa-smog";
+      return "fas fa-cloud-sun";
+    }
+
+    // 展示详细错误信息
+    function showErrorInfo(errorObj) {
+      const errorBox = document.getElementById("errorBox");
+      errorBox.style.display = "block";
+      errorBox.innerHTML = `
+        <span class="error-code">错误编码：${errorObj.code}</span><br>
+        错误标题：${errorObj.msg}<br>
+        故障原因：${errorObj.reason}<br>
+        解决建议：${errorObj.solve}
+      `;
+      console.error("天气请求错误详情：",errorObj);
+    }
+
+    // 隐藏错误提示
+    function hideErrorInfo() {
+      document.getElementById("errorBox").style.display = "none";
+    }
+
+    // 核心请求天气数据 多层错误捕获
+    async function getWeatherData(city) {
+      const tipBox = document.getElementById("tipBox");
+      const weatherCore = document.getElementById("weatherCore");
+      tipBox.style.display = "block";
+      weatherCore.style.display = "none";
+      hideErrorInfo();
+
+      // 校验输入城市合法性
+      if(!city || city.trim().length < 2){
+        tipBox.innerText = "城市名称不符合规范";
+        showErrorInfo(ERROR_CODE.HTTP_400);
+        return;
+      }
+
+      // 创建超时终止请求
+      const controller = new AbortController();
+      const timeoutTimer = setTimeout(() => {
+        controller.abort();
+        tipBox.innerText = "数据请求超时";
+        showErrorInfo(ERROR_CODE.NET_TIMEOUT);
+      }, REQUEST_TIMEOUT);
+
+      try {
+        const fetchOpt = {signal:controller.signal};
+        const res = await fetch(`${API_URL}?city=${encodeURIComponent(city)}`,fetchOpt);
+        clearTimeout(timeoutTimer);
+
+        // 分类判定HTTP状态码错误
+        switch(res.status){
+          case 400:
+            tipBox.innerText = "参数请求失败";
+            showErrorInfo(ERROR_CODE.HTTP_400);
+            return;
+          case 404:
+            tipBox.innerText = "接口地址失效";
+            showErrorInfo(ERROR_CODE.HTTP_404);
+            return;
+          case 410:
+            tipBox.innerText = "该地区暂无气象数据";
+            showErrorInfo(ERROR_CODE.HTTP_410);
+            return;
+          case 429:
+            tipBox.innerText = "查询频次受限";
+            showErrorInfo(ERROR_CODE.HTTP_429);
+            return;
+          case 500:
+            tipBox.innerText = "服务器运行异常";
+            showErrorInfo(ERROR_CODE.HTTP_500);
+            return;
+          case 502:
+            tipBox.innerText = "网关通信失败";
+            showErrorInfo(ERROR_CODE.HTTP_502);
+            return;
+          case 503:
+            tipBox.innerText = "服务临时暂停";
+            showErrorInfo(ERROR_CODE.HTTP_503);
+            return;
+        }
+
+        // 解析JSON数据异常捕获
+        let data;
+        try{
+          data = await res.json();
+        }catch(e){
+          tipBox.innerText = "数据格式解析失败";
+          showErrorInfo(ERROR_CODE.JSON_PARSE);
+          return;
+        }
+
+        // 判定空数据
+        if(!data || Object.keys(data).length === 0){
+          tipBox.innerText = "未获取到任何天气数据";
+          showErrorInfo(ERROR_CODE.DATA_EMPTY);
+          return;
+        }
+
+        // 校验核心必填字段完整性
+        const necessaryField = ["city","temperature","weather","report_time"];
+        const lossField = necessaryField.filter(key=>!(key in data));
+        if(lossField.length > 0){
+          tipBox.innerText = `缺失核心字段：${lossField.join(",")}`;
+          showErrorInfo(ERROR_CODE.FIELD_LOSS);
+          return;
+        }
+
+        // 数据正常渲染
+        renderAllWeatherData(data);
+        tipBox.style.display = "none";
+        weatherCore.style.display = "flex";
+
+      } catch (err) {
+        clearTimeout(timeoutTimer);
+        // 细分所有错误类型
+        const userAgent = navigator.userAgent;
+        const isEdge = userAgent.includes("Edg");
+        const isAndroid = userAgent.includes("Android");
+
+        if(!navigator.onLine){
+          tipBox.innerText = "设备网络未连接";
+          showErrorInfo(ERROR_CODE.NET_OFFLINE);
+        }else if(err.name === "AbortError"){
+          return;
+        }else if(err.message.includes("CORS") || err.message.includes("cross-origin")){
+          // 跨域错误细分
+          if(isEdge && (isAndroid || window.location.protocol === "file:")){
+            showErrorInfo(isAndroid ? ERROR_CODE.ANDROID_WEBVIEW_BLOCK : ERROR_CODE.EDGE_ENHANCED_SECURITY);
+          }else if(window.location.protocol === "file:" || window.location.protocol === "content:"){
+            showErrorInfo(ERROR_CODE.FILE_PROTOCOL_CORS);
+          }else{
+            showErrorInfo(ERROR_CODE.NET_CORS);
+          }
+        }else if(err.message.includes("Failed to fetch") || err.message.includes("NetworkError")){
+          // 网络错误细分
+          if(isAndroid && isEdge){
+            showErrorInfo(ERROR_CODE.ANDROID_WEBVIEW_BLOCK);
+          }else{
+            showErrorInfo(ERROR_CODE.PROXY_FIREWALL_BLOCK);
+          }
+        }else if(!window.fetch){
+          showErrorInfo(ERROR_CODE.BROWSER_OUTDATED);
+        }else{
+          tipBox.innerText = "未知网络请求错误";
+          showErrorInfo(ERROR_CODE.UNKNOWN_ERROR);
+        }
+        console.error("请求错误详情：",err);
+      }
+    }
+
+    // 渲染全部海量天气数据（修复undefined问题）
+    function renderAllWeatherData(data) {
+      // 基础信息渲染，全部加默认值
+      document.getElementById("cityName").innerText = `${data.province || ''} ${data.city || ''}`;
+      let tempVal = parseInt(data.temperature || 0);
+      let tempDom = document.getElementById("tempNum");
+      tempDom.innerText = `${data.temperature || '--'}°C`;
+      tempDom.className = tempVal >= 28 ? "temp temp-hot" : tempVal <= 8 ? "temp temp-cold" : "temp";
+
+      document.getElementById("weatherDesc").innerText = data.weather || '--';
+      document.getElementById("weatherIcon").innerHTML = `<i class="${getWeatherIcon(data.weather)}"></i>`;
+      document.getElementById("feelTemp").innerText = `${data.feels_like || '--'}°C`;
+      document.getElementById("humidity").innerText = `${data.humidity || '--'}%`;
+      document.getElementById("airPressure").innerText = `${data.pressure || '--'}hPa`;
+      document.getElementById("visibility").innerText = `${data.visibility || '--'}km`;
+      document.getElementById("windDir").innerText = data.wind_direction || '--';
+      document.getElementById("windLevel").innerText = `${data.wind_power || '--'}级`;
+      document.getElementById("windSpeed").innerText = `${data.wind_speed || '--'}m/s`;
+      document.getElementById("uvLevel").innerText = data.ultraviolet || '--';
+      document.getElementById("sunRise").innerText = data.sunrise || '--';
+      document.getElementById("sunSet").innerText = data.sunset || '--';
+      document.getElementById("aqiNum").innerText = data.aqi || '--';
+      document.getElementById("aqiLevel").innerText = data.air_level || '--';
+      document.getElementById("pm25").innerText = data.pm25 || '--';
+      document.getElementById("pm10").innerText = data.pm10 || '--';
+      document.getElementById("dressIndex").innerText = data.dress || '--';
+      document.getElementById("washIndex").innerText = data.car_wash || '--';
+      document.getElementById("sportIndex").innerText = data.exercise || '--';
+      document.getElementById("coldIndex").innerText = data.flu || '--';
+      document.getElementById("sunIndex").innerText = data.uv_protect || '--';
+      document.getElementById("dryIndex").innerText = data.dry_clothes || '--';
+      document.getElementById("updateTime").innerText = data.report_time || '--';
+      document.getElementById("weatherTips").innerText = `出行贴士：${data.notice || '暂无特别出行建议'}`;
+
+      renderForecast(data.forecast);
+      setWeatherBg(data.weather);
+    }
+
+    // 渲染多日预报（修复undefined问题）
+    function renderForecast(list) {
+      const wrap = document.getElementById("forecastList");
+      wrap.innerHTML = "";
+      if(!list || !Array.isArray(list)) return;
+      list.forEach(item => {
+        let div = document.createElement("div");
+        div.className = "forecast-item";
+        div.innerHTML = `
+          <div style="font-size:14px;margin-bottom:6px">${item.date || '--'}</div>
+          <i class="${getWeatherIcon(item.weather)}" style="font-size:22px"></i>
+          <div style="margin-top:6px;font-size:13px">${item.low || '--'}~${item.high || '--'}</div>
+        `;
+        wrap.appendChild(div);
+      });
+    }
+
+    // 城市搜索
+    function searchWeather() {
+      let input = document.getElementById("cityInput").value.trim();
+      if(!input) return;
+      currentCity = input;
+      getWeatherData(currentCity);
+      clearInterval(refreshTimer);
+      startAutoRefresh();
+    }
+
+    // IP定位城市 附带错误捕获
+    async function getIpLocationWeather() {
+      try {
+        const controller = new AbortController();
+        const locRes = await fetch("https://ipapi.co/json/",{signal:controller.signal});
+        if(!locRes.ok) throw new Error("定位接口异常");
+        let locData;
+        try{
+          locData = await locRes.json();
+        }catch(e){
+          throw new Error("定位数据解析失败");
+        }
+        if(!locData.city) throw new Error("无定位城市信息");
+        currentCity = locData.city;
+        document.getElementById("cityInput").value = currentCity;
+        getWeatherData(currentCity);
+      } catch {
+        showErrorInfo(ERROR_CODE.LOCATION_FAIL);
+      }
+    }
+
+    // 手动刷新
+    function manualRefresh() {
+      getWeatherData(currentCity);
+    }
+
+    // 自动刷新
+    function startAutoRefresh() {
+      refreshTimer = setInterval(() => getWeatherData(currentCity), REFRESH_INTERVAL);
+    }
+
+    // 全屏切换 错误捕获
+    function fullScreenToggle() {
+      try {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      } catch (e) {
+        showErrorInfo(ERROR_CODE.FULLSCREEN_FAIL);
+      }
+    }
+
+    // 天气语音播报 错误捕获
+    function voiceBroadcast() {
+      try {
+        if(!window.speechSynthesis) throw new Error("无语音引擎");
+        let city = document.getElementById("cityName").innerText;
+        let temp = document.getElementById("tempNum").innerText;
+        let weather = document.getElementById("weatherDesc").innerText;
+        let wind = document.getElementById("windDir").innerText + document.getElementById("windLevel").innerText;
+        let speechText = `${city}当前天气${weather}，温度${temp}，${wind}，出行注意防护`;
+        let speech = new SpeechSynthesisUtterance(speechText);
+        speech.lang = "zh-CN";
+        window.speechSynthesis.speak(speech);
+      } catch (e) {
+        showErrorInfo(ERROR_CODE.VOICE_FAIL);
+      }
+    }
+  </script>
+</body>
+</html>
